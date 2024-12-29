@@ -52,26 +52,30 @@ void vm_destroy(vm_t** v)
 	}
 }
 
-char* str_add(char* dest, char* src)
+char* str_add(char* dest, char* src, int src_len)
 {
-	size_t src_len = strlen(src);
-	printf("src: %s\n", src);
-	for (size_t i = 0; i < src_len; i++) {
-		darray_push(dest, src[i]);
+	printf("len: %d src: %.*s\n", src_len, src_len, src);
+	if (src_len) {
+		for (int i = 0; i < src_len; i++) {
+			darray_push(dest, src[i]);
+		}
+		darray_push(dest, '\0');
 	}
-	darray_push(dest, '\0');
 	return dest;
 }
 
-void vm_add_token(vm_t* v, char* start)
+void vm_add_token(vm_t* v, char* start, int len)
 {
-	darray_push(v->token_idx, darray_len(v->token_buf));
-	v->token_buf = str_add(v->token_buf, start);
+	if (len) {
+		darray_push(v->token_idx, darray_len(v->token_buf));
+		v->token_buf = str_add(v->token_buf, start, len);
+	}
 }
 
 void vm_scan_token(vm_t* v)
 {
 	size_t len = darray_len(v->token_idx);
+	printf("token idx buffer len: %lu\n", len);
 	for (size_t i = 0; i < len; i++) {
 		printf("+++++token %s\n", &v->token_buf[v->token_idx[i]]);
 	}
@@ -85,21 +89,35 @@ int process_input(vm_t* v, char* buffer, ssize_t len)
 
 	printf("input: %s, len: %ld\n", buffer, len);
 	while(count < len) {
-		if(buffer[count] == ' ') {
-			buffer[count] = '\0';
+		switch (buffer[count]) {
+		case ' ':
 			if (&buffer[count] - start != 0) {
 				printf("len: %ld\n", &buffer[count] - start);
 				printf("token: %s\n", start);
-				vm_add_token(v, start);
+				vm_add_token(v, start, &buffer[count] - start);
 			}
 			start = &buffer[count + 1];
+			count++;
+			break;
+		case '(':
+			vm_add_token(v, &buffer[count], 1);
+			start = &buffer[count + 1];
+			count++;
+			break;
+		case ')':
+			vm_add_token(v, start, &buffer[count] - start);
+			vm_add_token(v, &buffer[count], 1);
+			start = &buffer[count + 1];
+			count++;
+			break;
+		default:
+			count++;
 		}
-		count++;
 	}
 	if (*start != '\0') {
 		printf("the last one len: %ld\n", len - (start - buffer));
 		printf("token: %s\n", start);
-		vm_add_token(v, start);
+		vm_add_token(v, start, &buffer[len] - start + 1);
 	}
 	return ret;
 }
